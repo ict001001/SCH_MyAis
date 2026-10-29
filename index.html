@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Turn a gradebook export into weighted C.W, H.W, Quiz and Mid-Test marks and fill the MyAIS grade sheet.">
+<title>Gradebook Weight Mapper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: navy header band with a 4-step tracker, then a single working column of cards — setup row (level + file), the mapping board (files tray beside four section cards), and the results sheet. */
+:root{
+  --plate:#ffffff;
+  --band:#12305a; --band-2:#1b3f72; --band-ink:#ffffff; --band-muted:#b9c8de;
+  --bg:#f2f4f8; --surface:#ffffff; --surface-2:#f6f8fb; --ink:#18222f; --muted:#5b6878; --line:#dde3eb; --line-2:#c9d2de;
+  --accent:#2457c5; --accent-ink:#ffffff; --accent-soft:#e7eefb;
+  --cw:#0f7b6c; --cw-soft:#e2f2ef; --hw:#5146c9; --hw-soft:#ebe9fa;
+  --quiz:#b26a00; --quiz-soft:#fbf0dc; --mid:#bf3650; --mid-soft:#fae6ea;
+  --good:#127a4a; --warn:#a86400; --bad:#bf3340;
+  --s1:#2457c5; --s1-soft:#e7eefb; --s2:#0b8aa3; --s2-soft:#e0f3f7; --s3:#d35a1f; --s3-soft:#fcebe2; --s4:#1e8a4a; --s4-soft:#e3f4ea; --s5:#7a3fc2; --s5-soft:#f0e8fa;
+  --shadow:0 1px 2px rgba(18,48,90,.06),0 2px 10px rgba(18,48,90,.05);
+  --f-display:"Manrope","Segoe UI",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --band:#0c1d33; --band-2:#16304f; --band-ink:#eef3fa; --band-muted:#94a8c3;
+  --bg:#0e141c; --surface:#161f2a; --surface-2:#1b2633; --ink:#e6ecf3; --muted:#93a2b4; --line:#283545; --line-2:#36465a;
+  --accent:#7aa3ff; --accent-ink:#0b1422; --accent-soft:#1c2b47;
+  --cw:#42c4a8; --cw-soft:#14302b; --hw:#a59cff; --hw-soft:#242243; --quiz:#f0b24a; --quiz-soft:#342a17; --mid:#ff8399; --mid-soft:#3a1d26;
+  --s5:#b58cff; --s5-soft:#2a1f40;
+  --s1:#7aa3ff; --s1-soft:#1c2b47; --s2:#4cc6dd; --s2-soft:#12313a; --s3:#ff9563; --s3-soft:#3a2216; --s4:#55cf8a; --s4-soft:#163222;
+  --good:#47c78a; --warn:#f0b24a; --bad:#ff7d85; --shadow:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --band:#0c1d33; --band-2:#16304f; --band-ink:#eef3fa; --band-muted:#94a8c3;
+  --bg:#0e141c; --surface:#161f2a; --surface-2:#1b2633; --ink:#e6ecf3; --muted:#93a2b4; --line:#283545; --line-2:#36465a;
+  --accent:#7aa3ff; --accent-ink:#0b1422; --accent-soft:#1c2b47;
+  --cw:#42c4a8; --cw-soft:#14302b; --hw:#a59cff; --hw-soft:#242243; --quiz:#f0b24a; --quiz-soft:#342a17; --mid:#ff8399; --mid-soft:#3a1d26;
+  --s5:#b58cff; --s5-soft:#2a1f40;
+  --s1:#7aa3ff; --s1-soft:#1c2b47; --s2:#4cc6dd; --s2-soft:#12313a; --s3:#ff9563; --s3-soft:#3a2216; --s4:#55cf8a; --s4-soft:#163222;
+  --good:#47c78a; --warn:#f0b24a; --bad:#ff7d85; --shadow:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--band)}
+h1,h2,h3,h4{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+.inner{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---- header band ---- */
+.band{background:var(--band);color:var(--band-ink)}
+.band .inner{padding-block:22px 20px;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:42px;height:42px;border-radius:11px;background:var(--band-2);display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px;flex:none}
+.logo i{border-radius:3px;display:block}
+.plate{background:var(--plate);border-radius:12px;padding:8px 14px;display:flex;align-items:center;flex:none;max-width:100%;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.plate img{display:block;height:48px;width:auto;max-width:100%}
+.bsep{width:1px;align-self:stretch;background:var(--band-muted);opacity:.35}
+.btxt{min-width:0}
+@media (max-width:640px){.bsep{display:none}.plate img{height:40px}.brand{gap:12px}}
+.brand h1{font-size:clamp(1.35rem,3vw,1.75rem);font-weight:800}
+.brand p{color:var(--band-muted);font-size:.92rem}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:980px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}.stp.s5{grid-column:span 2}}
+.stp{display:flex;align-items:center;gap:10px;background:var(--band-2);border:1px solid transparent;border-radius:12px;padding:9px 12px;text-align:left;cursor:pointer;color:var(--band-ink);min-width:0;transition:border-color .15s}
+.stp:hover{border-color:var(--band-muted)}
+.stp .c{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:.8rem;font-family:var(--f-display);border:2px solid var(--band-muted);color:var(--band-ink)}
+.stp.done .c{background:var(--good);border-color:var(--good);color:#fff}
+.stp.warn .c{background:var(--quiz);border-color:var(--quiz);color:#1d1300}
+.stp .c svg{width:14px;height:14px}
+.stp b{display:block;font-size:.84rem;font-weight:700;line-height:1.2}
+.stp span{display:block;font-size:.76rem;color:var(--band-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stp>div{min-width:0}
+
+/* ---- page ---- */
+.main{padding-block:22px 72px;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:0;scroll-margin-top:16px}
+.card>.hd{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card>.bd{padding:18px 20px}
+.ttl{display:flex;align-items:center;gap:12px}
+.ttl .n{width:28px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:.85rem;flex:none}
+.ttl h2{font-size:1.08rem;font-weight:800}
+.ttl p{font-size:.84rem;color:var(--muted)}
+.setup{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px}
+@media (max-width:900px){.setup{grid-template-columns:1fr}}
+
+/* level picker */
+.levels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.levels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lvl{position:relative;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:11px 12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;transition:border-color .15s,background .15s;min-width:0}
+.lvl:hover{border-color:var(--line-2)}
+.lvl strong{font-family:var(--f-display);font-size:1rem;font-weight:800}
+.lvl span{font-size:.76rem;color:var(--muted)}
+.lvl .ws{font-family:var(--f-mono);font-size:.68rem;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lvl[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.lvl[aria-pressed="true"]::after{content:"";position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.wrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:16px 0 8px;flex-wrap:wrap}
+.wrow h4{font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+.weights{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:8px;align-items:end}
+@media (max-width:560px){.weights{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.wbox{display:flex;flex-direction:column;gap:4px;min-width:0}
+.wbox label{font-size:.76rem;font-weight:700;display:flex;align-items:center;gap:6px}
+.wbox label i{width:8px;height:8px;border-radius:2px}
+.wbox input{width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:8px;padding:8px 10px;font-variant-numeric:tabular-nums;font-weight:700}
+.total{display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding:0 4px 6px 8px}
+.total small{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+.total strong{font-family:var(--f-display);font-size:1.5rem;line-height:1;font-weight:800}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font-size:.84rem;font-weight:600}
+.linkbtn:hover{text-decoration:underline}
+
+/* upload */
+.drop{border:2px dashed var(--line-2);border-radius:12px;padding:20px 16px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--surface-2);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ic{width:44px;height:44px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.drop .ic svg{width:24px;height:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line-2);background:var(--surface);border-radius:9px;padding:9px 15px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,filter .15s;white-space:nowrap;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:5px 11px;font-size:.82rem;border-radius:8px;min-height:32px}
+.btn svg{width:17px;height:17px;flex:none}
+.btn:disabled{cursor:default;color:var(--muted);border-color:var(--line);background:var(--surface-2)}
+.btn:disabled:hover{border-color:var(--line)}
+.fileinfo{margin-top:12px}
+.fsum{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;flex-wrap:wrap}
+.fsum .fi{width:36px;height:36px;border-radius:9px;background:var(--cw-soft);color:var(--cw);display:grid;place-items:center;flex:none}
+.fsum.sample .fi{background:var(--quiz-soft);color:var(--quiz)}
+.fsum .fi svg{width:20px;height:20px}
+.fsum .ft{min-width:0;flex:1}
+.fsum .ft b{display:block;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fsum .ft span{font-size:.8rem;color:var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:600}
+.tag.demo{background:var(--quiz-soft);border-color:transparent;color:var(--quiz)}
+
+/* how it works */
+.guide{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+@media (max-width:760px){.guide{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.guide div{display:flex;gap:8px;align-items:flex-start;font-size:.84rem;background:var(--surface-2);border-radius:10px;padding:9px 11px}
+.guide i{flex:none;width:10px;height:10px;border-radius:3px;margin-top:5px}
+
+/* board */
+.board{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.1fr);gap:16px}
+@media (max-width:940px){.board{grid-template-columns:1fr}}
+.tray{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;align-self:start}
+@media (min-width:941px){.tray{position:sticky;top:calc(12px + env(safe-area-inset-top,0px));max-height:calc(100vh - 24px);overflow:auto}}
+.tray.over{outline:2px dashed var(--accent)}
+.trayhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:9px;overflow:hidden;background:var(--surface);padding:2px;gap:2px}
+.seg button{border:0;background:none;padding:5px 11px;font-size:.82rem;font-weight:600;cursor:pointer;color:var(--muted);border-radius:7px}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.group{display:flex;flex-direction:column;gap:6px}
+.group h4{margin:4px 0 0;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:5px 9px;font-size:.85rem;font-weight:600;cursor:grab;user-select:none;max-width:100%;transition:border-color .12s,box-shadow .12s}
+.chip:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.chip:active{cursor:grabbing}
+.chip .mx{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);background:var(--accent-soft)}
+.chip.dragging{opacity:.4}
+.chip.nomk{border-style:dashed}
+.chip.nomk .nm{color:var(--muted)}
+.emk{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--warn);background:var(--quiz-soft);border-radius:4px;padding:0 5px}
+.dots{display:inline-flex;gap:3px}
+.dots i{width:7px;height:7px;border-radius:50%}
+.chip .x{border:0;background:none;padding:0 0 0 2px;cursor:pointer;color:var(--muted);font-size:1.05rem;line-height:1}
+.chip .x:hover{color:var(--bad)}
+.selbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--accent-soft);border-radius:10px;padding:8px 10px;font-size:.82rem;font-weight:600}
+.empty{font-size:.84rem;color:var(--muted);padding:6px 2px}
+
+.zones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:600px){.zones{grid-template-columns:1fr}}
+.zone{--z:var(--accent);--zs:var(--accent-soft);border:1px solid var(--line);background:var(--surface);border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:11px;min-width:0;transition:background .15s,box-shadow .15s,border-color .15s}
+.zone[data-z="cw"]{--z:var(--cw);--zs:var(--cw-soft)}
+.zone[data-z="hw"]{--z:var(--hw);--zs:var(--hw-soft)}
+.zone[data-z="quiz"]{--z:var(--quiz);--zs:var(--quiz-soft)}
+.zone[data-z="mid"]{--z:var(--mid);--zs:var(--mid-soft)}
+.zone.over{background:var(--zs);border-color:var(--z);box-shadow:0 0 0 2px var(--z)}
+.zone.off{opacity:.6}
+.zhead{display:flex;align-items:center;gap:11px}
+.zicon{width:38px;height:38px;border-radius:10px;background:var(--zs);color:var(--z);display:grid;place-items:center;flex:none}
+.zicon svg{width:20px;height:20px}
+.zt{flex:1;min-width:0}
+.zt h3{font-size:1.05rem;font-weight:800;line-height:1.2}
+.zt small{font-size:.8rem;color:var(--muted)}
+.wpill{background:var(--zs);color:var(--z);font-weight:800;font-size:.8rem;border-radius:999px;padding:3px 11px;white-space:nowrap;font-family:var(--f-display)}
+.zone>.seg{display:grid;grid-template-columns:1fr 1fr}
+.zone>.seg button[aria-pressed="true"]{background:var(--z);color:#fff}
+.rule{font-size:.84rem;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rule input{width:56px;border:1px solid var(--line-2);background:var(--surface-2);border-radius:7px;padding:3px 7px;font-weight:700;font-variant-numeric:tabular-nums}
+.zdrop{min-height:76px;border:1.5px dashed var(--line-2);border-radius:10px;padding:9px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;background:var(--surface-2)}
+.zdrop.manual{border-style:solid;border-color:transparent;background:var(--zs)}
+.zdrop .ph{font-size:.82rem;color:var(--muted);margin:auto;text-align:center;padding:4px}
+.zone .chip{border-color:color-mix(in srgb,var(--z) 40%,var(--line))}
+.zfoot{display:flex;flex-wrap:wrap;gap:6px}
+.boardfoot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:.86rem}
+
+/* results */
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.exp{display:inline-flex;border:1px solid var(--line-2);border-radius:10px;overflow:hidden}
+.exp .btn{border:0;border-radius:0;border-right:1px solid var(--line-2)}
+.exp .btn:last-child{border-right:0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border:1px solid var(--line);border-radius:11px;padding:11px 14px}
+.stat small{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800}
+.stat strong{font-family:var(--f-display);font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums}
+.stat em{font-style:normal;color:var(--muted);font-size:.82rem;margin-left:4px}
+.opts{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:12px;font-size:.86rem}
+.opts label{display:inline-flex;align-items:center;gap:6px}
+.opts select,.search{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:6px 9px}
+.searchwrap{position:relative;display:inline-flex;align-items:center}
+.searchwrap svg{position:absolute;left:9px;width:16px;height:16px;color:var(--muted);pointer-events:none}
+.search{min-width:0;width:240px;max-width:100%;padding-left:31px}
+.warn{display:flex;flex-direction:column;gap:4px;background:var(--quiz-soft);border:1px solid color-mix(in srgb,var(--quiz) 40%,transparent);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:.87rem;font-weight:500}
+.tablewrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:11px}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{padding:9px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:nth-child(-n+3),td:nth-child(-n+3){text-align:left}
+thead th{background:var(--surface-2);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;font-weight:800}
+thead th:hover{color:var(--ink)}
+thead th .w{display:block;font-family:var(--f-mono);text-transform:none;letter-spacing:0;font-size:.7rem;font-weight:500}
+thead th[data-k="cw"]{box-shadow:inset 0 -3px 0 var(--cw)}
+thead th[data-k="hw"]{box-shadow:inset 0 -3px 0 var(--hw)}
+thead th[data-k="quiz"]{box-shadow:inset 0 -3px 0 var(--quiz)}
+thead th[data-k="mid"]{box-shadow:inset 0 -3px 0 var(--mid)}
+th:first-child,td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
+thead th:first-child{z-index:3;background:var(--surface-2)}
+tbody tr:nth-child(even) td{background:var(--surface-2)}
+tbody tr:hover td{background:var(--accent-soft)}
+tbody tr:last-child td{border-bottom:0}
+td.nm{font-weight:600}
+td.id{color:var(--muted);font-family:var(--f-mono);font-size:.78rem}
+td .na{color:var(--muted)}
+td.tot{font-weight:800}
+tr.nomarks td{color:var(--muted)}
+.nmtag{display:inline-block;margin-left:6px;font-size:.66rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--mid-soft);color:var(--mid);border-radius:999px;padding:1px 8px;vertical-align:1px}
+.totcell{display:inline-flex;align-items:center;gap:8px}
+.bar{width:56px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px}
+.qin{width:68px;border:1px solid var(--line-2);background:var(--surface);border-radius:7px;padding:4px 7px;text-align:right;font-variant-numeric:tabular-nums}
+.qin.bad{border-color:var(--bad);background:var(--mid-soft)}
+.foot{font-size:.82rem;color:var(--muted);margin-top:10px}
+
+/* bottom update bar + toast */
+.updbar{position:fixed;left:0;right:0;bottom:0;z-index:15;display:flex;justify-content:center;padding-block:12px calc(12px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none;transform:translateY(110%);transition:transform .2s}
+.updbar.on{transform:none}
+.updbar>div{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 14px;background:var(--band);color:var(--band-ink);border-radius:14px;padding:10px 12px 10px 18px;box-shadow:0 8px 28px rgba(0,0,0,.25);font-weight:600;font-size:.92rem;max-width:100%}
+.updbar .dot{width:9px;height:9px;border-radius:50%;background:var(--quiz);flex:none}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:.9rem;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100% - 32px);z-index:20}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+body.has-upd .toast{bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+body.has-upd .main{padding-bottom:120px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.pulse{animation:pulse .35s ease 2}
+/* each step has its own colour */
+.stp.s1,#s-level{--sc:var(--s1);--scs:var(--s1-soft)}
+.stp.s2,#s-file{--sc:var(--s2);--scs:var(--s2-soft)}
+.stp.s3,#s-map{--sc:var(--s3);--scs:var(--s3-soft)}
+.stp.s4,#s-res{--sc:var(--s4);--scs:var(--s4-soft)}
+.stp{border-left:4px solid var(--sc)}
+.stp .c{border-color:var(--sc);color:var(--band-ink)}
+.stp.done .c{background:var(--sc);border-color:var(--sc);color:#fff}
+.stp.warn .c{background:var(--quiz);border-color:var(--quiz);color:#1d1300}
+.stp.s5,#s-myais{--sc:var(--s5);--scs:var(--s5-soft)}
+#s-level,#s-file,#s-map,#s-res,#s-myais{border-top:4px solid var(--sc)}
+.mtop{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;align-items:start}
+@media (max-width:820px){.mtop{grid-template-columns:1fr}}
+.howto{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.howto li{display:flex;gap:10px;align-items:flex-start;font-size:.9rem}
+.howto li>span{flex:none;width:24px;height:24px;border-radius:50%;background:var(--s5-soft);color:var(--s5);display:grid;place-items:center;font-weight:800;font-size:.78rem;font-family:var(--f-display)}
+.fsum.myais .fi{background:var(--s5-soft);color:var(--s5)}
+.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.meta div{background:var(--surface-2);border-radius:9px;padding:7px 10px;min-width:0}
+.meta small{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:800}
+.meta b{display:block;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mbody{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+#mbody:empty{display:none}
+#mbody .warn{margin:0}
+.mmap{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.84rem}
+.wchk{border-radius:999px;padding:3px 10px;font-weight:700;font-size:.8rem}
+.wchk.ok{background:var(--s4-soft);color:var(--good)}
+.wchk.bad{background:var(--mid-soft);color:var(--bad)}
+.mtbl th,.mtbl td{text-align:left}
+.mtbl th.r,.mtbl td.r{text-align:right}
+.mst{font-size:.72rem;font-weight:800;border-radius:999px;padding:2px 9px;text-transform:uppercase;letter-spacing:.03em}
+.mst.ok{background:var(--s4-soft);color:var(--good)}
+.mst.miss{background:var(--mid-soft);color:var(--bad)}
+.card .ttl .n{background:var(--sc);color:#fff}
+.card>.hd{background:linear-gradient(var(--scs),var(--scs)) top/100% 100% no-repeat;border-radius:10px 10px 0 0}
+.card>.hd .ttl h2{color:var(--sc)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card .ttl .n,:root:not([data-theme="light"]) .stp.done .c{color:#0b1422}}
+:root[data-theme="dark"] .card .ttl .n,:root[data-theme="dark"] .stp.done .c{color:#0b1422}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<header class="band">
+  <div class="inner">
+    <div class="brand">
+      <div class="plate"><img src="data:image/webp;base64,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" alt="Al-Rowad International Schools" width="400" height="75"></div>
+      <span class="bsep" aria-hidden="true"></span>
+      <div class="btxt">
+        <h1>Gradebook Weight Mapper</h1>
+        <p>Turn your gradebook export into weighted C.W, H.W, Quiz and Mid-Test marks in four steps.</p>
+      </div>
+    </div>
+    <nav class="steps" id="steps" aria-label="Progress"></nav>
+  </div>
+</header>
+
+<main class="inner main">
+  <section class="setup">
+    <div class="card" id="s-level">
+      <div class="hd"><div class="ttl"><span class="n">1</span><div><h2>Grade level</h2><p>Sets the weight of each section</p></div></div></div>
+      <div class="bd">
+        <div class="levels" id="levels"></div>
+        <div class="wrow"><h4>Weights (marks)</h4><button class="linkbtn" id="resetW" type="button">Reset to school weights</button></div>
+        <div class="weights" id="weights"></div>
+      </div>
+    </div>
+
+    <div class="card" id="s-file">
+      <div class="hd"><div class="ttl"><span class="n">2</span><div><h2>Gradebook file</h2><p>CSV or Excel export from your LMS</p></div></div></div>
+      <div class="bd">
+        <div class="drop" id="drop">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6"/><path d="m9.5 13.5 2.5-2.5 2.5 2.5"/></svg></span>
+          <strong>Drop your gradebook file here</strong>
+          <label class="btn primary" for="fileIn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m21.4 11.1-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+            Attach your export gradebook
+          </label>
+          <input type="file" id="fileIn" accept=".csv,.xlsx,.xls,text/csv" hidden>
+        </div>
+        <div class="fileinfo" id="fileinfo"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="s-map">
+    <div class="hd">
+      <div class="ttl"><span class="n">3</span><div><h2>Sections</h2><p>Drag files into each section, or switch a section to Type marks</p></div></div>
+    </div>
+    <div class="bd">
+      <div class="guide">
+        <div><i style="background:var(--cw)"></i><span><b>C.W</b> · average of all classwork files</span></div>
+        <div><i style="background:var(--hw)"></i><span><b>H.W</b> · average of all homework files</span></div>
+        <div><i style="background:var(--quiz)"></i><span><b>Quiz</b> · average of quiz files, or typed marks</span></div>
+        <div><i style="background:var(--mid)"></i><span><b>Mid-Test</b> · average of the best two classwork files</span></div>
+      </div>
+      <div class="board">
+        <div class="tray" id="tray"></div>
+        <div class="zones" id="zones"></div>
+      </div>
+      <div class="boardfoot">
+        <span class="muted">After changing the sections, click Update Result to refresh the marks.</span>
+        <button class="btn" type="button" data-update disabled>Results up to date</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="s-res">
+    <div class="hd">
+      <div class="ttl"><span class="n">4</span><div><h2>Weighted marks</h2><p>Check the marks, then copy or download</p></div></div>
+      <div class="actions">
+        <button class="btn" type="button" data-update disabled>Results up to date</button>
+        <div class="exp">
+          <button class="btn" id="copyBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy</button>
+          <button class="btn" id="csvBtn" type="button">CSV</button>
+          <button class="btn primary" id="xlsxBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Excel</button>
+        </div>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="stats" id="stats"></div>
+      <div class="opts">
+        <span class="searchwrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input class="search" id="search" type="search" placeholder="Search student or ID" aria-label="Search students"></span>
+        <label for="dec">Round to
+          <select id="dec"><option value="0">whole marks</option><option value="1">1 decimal</option><option value="2" selected>2 decimals</option></select>
+        </label>
+        <label for="blank">Missing marks
+          <select id="blank"><option value="skip">skip (not counted)</option><option value="zero">count as zero</option></select>
+        </label>
+        <label for="hideEmpty" id="hideLbl"><input type="checkbox" id="hideEmpty" checked> <span id="hideTxt">Hide students with no marks</span></label>
+      </div>
+      <div class="warn" id="warn" role="status" hidden></div>
+      <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+      <p class="foot" id="foot"></p>
+    </div>
+  </section>
+  <section class="card" id="s-myais">
+    <div class="hd">
+      <div class="ttl"><span class="n">5</span><div><h2>Export to MyAIS</h2><p>Attach the MyAIS grade sheet and fill it with the marks from step 4</p></div></div>
+      <div class="actions"><button class="btn primary" id="myaisBtn" type="button" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg>Export to MyAIS</button></div>
+    </div>
+    <div class="bd">
+      <div class="mtop" id="mtop">
+        <div class="drop" id="mdrop">
+          <span class="ic" style="background:var(--s5-soft);color:var(--s5)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
+          <strong>Drop the MyAIS grade sheet here</strong>
+          <label class="btn" for="mfileIn">Attach MyAIS file</label>
+          <input type="file" id="mfileIn" accept=".csv,.txt,.tsv,text/csv" hidden>
+        </div>
+        <div id="minfo"></div>
+      </div>
+      <div id="mbody"></div>
+    </div>
+  </section>
+</main>
+<div class="updbar" id="updbar"><div><span class="dot"></span><span>You changed the sections. The marks are not updated yet.</span><button class="btn primary" type="button" data-update>Update Result</button></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const KEYS=["cw","hw","quiz","mid"];
+const ZONES=[
+  {k:"cw",  label:"C.W",      full:"Classwork"},
+  {k:"hw",  label:"H.W",      full:"Homework"},
+  {k:"quiz",label:"Quiz",     full:"Quizzes"},
+  {k:"mid", label:"Mid-Test", full:"Best classwork files"}
+];
+const SV=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ZICON={
+  cw:SV('<path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M16 5h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2"/><path d="m9 13 2 2 4-4"/>'),
+  hw:SV('<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/>'),
+  quiz:SV('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><path d="M12 17h.01"/>'),
+  mid:SV('<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5v1a3 3 0 0 0 3 3"/><path d="M16 6h3v1a3 3 0 0 1-3 3"/><path d="M12 13v4"/><path d="M8 20h8"/><path d="M10 17h4v3h-4z"/>')
+};
+const ICON_OK=SV('<path d="m5 12 5 5 9-10"/>');
+const ZL=k=>ZONES.find(z=>z.k===k).label;
+const ZCOLOR={cw:"var(--cw)",hw:"var(--hw)",quiz:"var(--quiz)",mid:"var(--mid)"};
+const LEVELS=[
+  {k:"kg",  name:"KG",         sub:"KG1 – KG3",  w:{cw:2.5,hw:2.5,quiz:10,mid:10}},
+  {k:"g13", name:"Grades 1–3", sub:"Lower primary",w:{cw:2.5,hw:2.5,quiz:10,mid:10}},
+  {k:"g48", name:"Grades 4–8", sub:"Upper primary & middle",w:{cw:6,hw:3,quiz:5,mid:6}},
+  {k:"g912",name:"Grades 9–12",sub:"High school",w:{cw:6,hw:4,quiz:0,mid:10}}
+];
+
+/* ---------- persistence (per-device convenience only) ---------- */
+const store={get(k,d){try{const v=localStorage.getItem("gwm_"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+             set(k,v){try{localStorage.setItem("gwm_"+k,JSON.stringify(v))}catch(e){}}};
+
+const S={
+  level:store.get("level","g48"),
+  custom:store.get("custom",{}),
+  files:[],students:[],
+  zones:{cw:[],hw:[],quiz:[],mid:[]},
+  mode:{cw:"files",hw:"files",quiz:"manual",mid:"files"},
+  outOf:{}, midBest:2,
+  manual:{cw:{},hw:{},quiz:{},mid:{}},
+  blank:store.get("blank","skip"), dec:store.get("dec",2),
+  sort:{k:"name",dir:1}, q:"", hideEmpty:true,
+  trayFilter:"all", selected:new Set(), source:null, dirty:false
+};
+let A=null; /* the settings the results table was last updated with */
+function W(){return Object.assign({},LEVELS.find(l=>l.k===S.level).w,S.custom[S.level]||{})}
+const sumW=w=>+(w.cw+w.hw+w.quiz+w.mid).toFixed(2);
+function outOf(k,cfg){cfg=cfg||{outOf:S.outOf,w:W()};return cfg.outOf[k]!=null?cfg.outOf[k]:(cfg.w[k]||10)}
+
+function snapshot(){return{zones:JSON.parse(JSON.stringify(S.zones)),mode:Object.assign({},S.mode),outOf:Object.assign({},S.outOf),midBest:S.midBest,w:W(),level:S.level}}
+function sectionWarnings(cfg){
+  const out=[];
+  KEYS.forEach(k=>{if(cfg.mode[k]!=="files")return;const ids=cfg.zones[k];if(!ids.length)return;
+    if(!cfg.w[k]){out.push(`${ZL(k)} has files but its weight is 0 for ${LEVELS.find(l=>l.k===cfg.level).name}, so it isn't counted. Set a ${ZL(k)} weight in step 1 to include it.`);return}
+    const fs=ids.map(id=>S.files.find(f=>f.id===id)).filter(Boolean);
+    const empty=fs.filter(f=>!f.count);
+    if(empty.length===fs.length)out.push(`${ZL(k)}: ${fs.length>1?"none of the "+fs.length+" files have":"the file "+fs[0].name+" has"} any marks in this export, so the ${ZL(k)} column shows “—”. Add a file with marks, or switch ${ZL(k)} to Type marks.`);
+    else if(empty.length)out.push(`${ZL(k)}: ${empty.map(f=>f.name).join(", ")} ${empty.length>1?"have":"has"} no marks and ${empty.length>1?"are":"is"} skipped.`);
+  });
+  return out;
+}
+function applyNow(silent){A=snapshot();S.dirty=false;renderResults();renderDirty();
+  const w=sectionWarnings(A);
+  if(!silent)toast(w.length?"Results updated. Check the note above the table.":"Results updated")}
+function markDirty(){if(!A){applyNow(true);return}S.dirty=true;renderDirty()}
+function renderDirty(){
+  document.querySelectorAll("[data-update]").forEach(b=>{b.disabled=!S.dirty;b.classList.toggle("primary",S.dirty);
+    b.innerHTML=S.dirty?UPD_ICON+"Update Result":CHECK_ICON+"Results up to date"});
+  $("#updbar").classList.toggle("on",S.dirty);
+  document.body.classList.toggle("has-upd",S.dirty);
+  renderProgress();
+}
+const UPD_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>';
+const CHECK_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+document.addEventListener("click",e=>{if(e.target.closest("[data-update]")&&S.dirty)applyNow()});
+
+/* ---------- parsing ---------- */
+const HEAD_RE=/^(.*?)\s*\(Max Points:\s*([\d.]+),\s*Grading Category:\s*(.*?)\)\s*$/i;
+const FLAG_RE=/\((Count in Grade|Collected)\)\s*$/i;
+function cleanFirst(s){return (s||"").replace(/-S\d+$/i,"").trim()}
+function splitLast(s){s=(s||"").trim();const m=s.match(/^(.*?)-((?:KG|G)\s?\d+.*)$/i);return m?{name:m[1],cls:m[2]}:{name:s,cls:""}}
+function catType(c){c=(c||"").toLowerCase();if(c.includes("home"))return"hw";if(c.includes("class"))return"cw";if(c.includes("ungraded"))return"un";return"other"}
+function toNum(v){if(v==null)return null;v=String(v).trim();if(v===""||/^n\/?a$/i.test(v))return null;const n=parseFloat(v);return isFinite(n)?n:null}
+
+function parseRows(rows,srcName,isDemo){
+  rows=rows.filter(r=>r&&r.some(c=>String(c).trim()!==""));
+  if(rows.length<2)throw new Error("The file has no student rows.");
+  const h=rows[0].map(x=>String(x).trim());
+  const idx=n=>h.findIndex(x=>x.toLowerCase()===n);
+  const iF=idx("first name"),iL=idx("last name"),iId=idx("unique user id"),iU=idx("username");
+  const files=[];
+  h.forEach((col,i)=>{const m=col.match(HEAD_RE);if(!m)return;
+    let flag=-1;if(h[i+1]&&FLAG_RE.test(h[i+1]))flag=i+1;
+    files.push({id:"c"+i,col:i,flag,name:m[1].trim()||"Untitled",max:parseFloat(m[2])||0,cat:m[3].trim(),type:catType(m[3])});
+  });
+  if(!files.length)throw new Error("No assignment columns found. Columns should look like “HW1 (Max Points: 3, Grading Category: Homework)”.");
+  const students=[];
+  rows.slice(1).forEach((r,ri)=>{
+    const first=cleanFirst(iF>=0?r[iF]:""),ln=splitLast(iL>=0?r[iL]:"");
+    const id=(iId>=0&&r[iId]?String(r[iId]).trim():"")||(iU>=0?String(r[iU]||"").trim():"")||("row"+(ri+2));
+    if(!first&&!ln.name)return;
+    const sc={};let any=false;
+    files.forEach(f=>{
+      const counted=f.flag<0||!/^false$/i.test(String(r[f.flag]||"").trim());
+      const v=counted?toNum(r[f.col]):null;sc[f.id]=v;if(v!=null)any=true;
+    });
+    students.push({sid:id,name:(first+" "+ln.name).trim(),cls:ln.cls,scores:sc,any});
+  });
+  files.forEach(f=>{f.count=students.filter(st=>st.scores[f.id]!=null).length});
+  S.files=files;S.students=students;S.manual={cw:{},hw:{},quiz:{},mid:{}};S.selected.clear();
+  const classes=[...new Set(students.map(s=>s.cls).filter(Boolean))];
+  S.source={name:srcName,demo:!!isDemo,cls:classes};
+  autoMap();
+  const det=detectLevel(classes);
+  if(det&&det!==S.level){S.level=det;store.set("level",det);S.outOf={};
+    if(!isDemo)toast("Detected "+classes[0]+" → "+LEVELS.find(l=>l.k===det).name);}
+  renderLevels();renderSource();renderBoard();applyNow(true);
+}
+function detectLevel(cls){
+  for(const c of cls){if(/^KG/i.test(c))return"kg";const m=c.match(/^G\s?(\d+)/i);if(m){const g=+m[1];
+    if(g>=1&&g<=3)return"g13";if(g>=4&&g<=8)return"g48";if(g>=9&&g<=12)return"g912";}}
+  return null;
+}
+function autoMap(){
+  S.zones={cw:[],hw:[],quiz:[],mid:[]};
+  S.files.forEach(f=>{if(f.type==="cw")S.zones.cw.push(f.id);else if(f.type==="hw")S.zones.hw.push(f.id);});
+  S.zones.mid=S.zones.cw.slice();
+  S.mode={cw:"files",hw:"files",quiz:"manual",mid:"files"};
+}
+
+function handleFile(file){
+  if(!file)return;
+  const name=file.name||"gradebook";
+  const isX=/\.xlsx?$/i.test(name);
+  const rd=new FileReader();
+  rd.onerror=()=>toast("Couldn't read that file. Try exporting it again.");
+  rd.onload=()=>{
+    try{
+      let rows;
+      if(isX){
+        if(!window.XLSX)throw new Error("Excel reader didn't load. Save the file as CSV and try again.");
+        const wb=XLSX.read(new Uint8Array(rd.result),{type:"array"});
+        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
+      }else{
+        if(!window.Papa)throw new Error("CSV reader didn't load. Reload the page and try again.");
+        const dec=decodeBuf(rd.result);
+        if(!/Max Points/i.test(dec.text)&&/student\s*id/i.test(dec.text)){parseMyais(rd.result,name);$("#s-myais").scrollIntoView({block:"start"});return}
+        rows=Papa.parse(dec.text,{skipEmptyLines:true}).data;
+      }
+      parseRows(rows,name,false);
+      toast("Loaded "+S.students.filter(s=>s.any).length+" students and "+S.files.length+" files");
+    }catch(e){toast(e.message||"That file couldn't be read.")}
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* ---------- demo class (invented names, clearly marked) ---------- */
+function demoRows(){
+  let t=20261029;const rnd=()=>{t|=0;t=t+0x6D2B79F5|0;let x=Math.imul(t^t>>>15,1|t);x=x+Math.imul(x^x>>>7,61|x)^x;return((x^x>>>14)>>>0)/4294967296};
+  const names=[["Yusuf","Haddad"],["Layla","Nasser"],["Omar","Farouk"],["Sara","Amin"],["Khalid","Mansour"],["Huda","Saleh"],["Ibrahim","Qasim"],["Noor","Kareem"],["Tariq","Zaki"],["Maryam","Fadel"]];
+  const fs=[["CW1",6,"Q1_Classwork"],["CW2",6,"Q1_Classwork"],["Task3",6,"Q1_Classwork"],["Project1",10,"Q1_Classwork"],["CW5",5,"Q1_Classwork"],["Practical Task",20,"Q1_Classwork"],
+            ["HW1",3,"Q1_Homework"],["HW2",3,"Q1_Homework"],["HW3",5,"Q1_Homework"],["HW4",6,"Q1_Homework"],["Quiz1",10,"Q1_Classwork"],["Diagnostic Test",100,"Ungraded"]];
+  const head=["First Name","Last Name","Unique User ID","Overall"];
+  fs.forEach(f=>{head.push(`${f[0]} (Max Points: ${f[1]}, Grading Category: ${f[2]})`,`${f[0]} (Count in Grade)`)});
+  const rows=[head];
+  names.forEach((n,i)=>{const id="S9000"+(10+i),skill=.55+rnd()*.45;
+    const r=[n[0]+"-"+id,n[1]+"-G5-A",id,""];
+    fs.forEach(f=>{const miss=rnd()<.12;const v=miss?"":(Math.round(Math.min(1,skill+(rnd()-.5)*.35)*f[1]*4)/4);r.push(String(v),"True")});
+    rows.push(r)});
+  return rows;
+}
+
+/* ---------- computation (always from the last updated settings A) ---------- */
+function pct(s,fid){const f=S.files.find(x=>x.id===fid);if(!f||!f.max)return null;const v=s.scores[fid];
+  if(v==null)return S.blank==="zero"?0:null;return Math.max(0,v/f.max);}
+function pctList(s,ids){return ids.map(id=>pct(s,id)).filter(v=>v!=null)}
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+function compute(s){
+  const r={};
+  KEYS.forEach(k=>{
+    let p=null,n=0;
+    if(A.mode[k]==="manual"){const v=S.manual[k][s.sid],o=outOf(k,A);
+      if(v!=null&&v!==""&&o){p=Math.max(0,+v/o);n=1}}
+    else{let L=pctList(s,A.zones[k]);if(k==="mid")L=L.sort((a,b)=>b-a).slice(0,Math.max(1,A.midBest));p=avg(L);n=L.length}
+    r[k+"P"]=p;r[k+"N"]=n;r[k]=(p==null||!A.w[k])?null:p*A.w[k];
+  });
+  r.total=KEYS.reduce((t,k)=>t+(r[k]||0),0);
+  return r;
+}
+function rnd(v){const d=+S.dec,p=Math.pow(10,d);return Math.round((v+Number.EPSILON)*p)/p}
+function fmt(v){return v==null?"":rnd(v).toFixed(+S.dec)}
+
+/* ---------- UI: level & weights ---------- */
+function renderLevels(){
+  queueMicrotask(renderProgress);
+  $("#levels").innerHTML=LEVELS.map(l=>`<button class="lvl" type="button" data-l="${l.k}" aria-pressed="${l.k===S.level}"><strong>${l.name}</strong><span>${l.sub}</span><span class="ws">${(()=>{const w=Object.assign({},l.w,S.custom[l.k]||{});return `${w.cw} · ${w.hw} · ${w.quiz||"–"} · ${w.mid} = ${sumW(w)}`})()}</span></button>`).join("");
+  const w=W();
+  $("#weights").innerHTML=ZONES.map(z=>`<div class="wbox"><label for="w_${z.k}"><i style="background:${ZCOLOR[z.k]}"></i>${z.label}</label><input id="w_${z.k}" type="number" min="0" step="0.5" inputmode="decimal" value="${w[z.k]}" data-w="${z.k}"></div>`).join("")+
+    `<div class="total"><small>Total</small><strong class="num" id="wTotal">${sumW(w)}</strong></div>`;
+}
+$("#levels").addEventListener("click",e=>{const b=e.target.closest(".lvl");if(!b)return;S.level=b.dataset.l;S.outOf={};store.set("level",S.level);renderLevels();renderZones();markDirty();});
+$("#weights").addEventListener("input",e=>{const k=e.target.dataset.w;if(!k)return;const v=parseFloat(e.target.value);
+  S.custom[S.level]=Object.assign({},S.custom[S.level]||{},{[k]:isFinite(v)&&v>=0?v:0});store.set("custom",S.custom);
+  $("#wTotal").textContent=sumW(W());renderZones();markDirty();});
+$("#resetW").addEventListener("click",()=>{delete S.custom[S.level];store.set("custom",S.custom);S.outOf={};renderLevels();renderZones();markDirty();toast("Weights reset for "+LEVELS.find(l=>l.k===S.level).name)});
+
+/* ---------- UI: source ---------- */
+function renderSource(){
+  queueMicrotask(renderProgress);
+  const s=S.source;if(!s){$("#fileinfo").innerHTML="";return}
+  const n=S.students.filter(x=>x.any).length;
+  const icon=SV('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/>');
+  $("#fileinfo").innerHTML=`<div class="fsum${s.demo?" sample":""}"><span class="fi">${icon}</span><div class="ft"><b>${s.demo?"Sample class loaded":esc(s.name)}</b><span class="num">${s.cls.length?esc(s.cls.slice(0,3).join(", "))+(s.cls.length>3?" +"+(s.cls.length-3):"")+" · ":""}${n} students · ${S.files.length} files</span></div>${s.demo?'<span class="tag demo">Invented names</span>':'<span class="tag">Your file</span>'}</div>`+
+    (s.demo?`<p class="muted" style="font-size:.82rem;margin-top:8px">Attach your own export to replace the sample class.</p>`:"");
+}
+function renderProgress(){
+  const el=$("#steps");if(!el)return;
+  const lv=LEVELS.find(l=>l.k===S.level);
+  const mapped=KEYS.filter(k=>S.mode[k]==="manual"||S.zones[k].length).length;
+  const files=new Set(KEYS.flatMap(k=>S.mode[k]==="files"?S.zones[k]:[])).size;
+  const st=[
+    {t:"#s-level",n:1,b:"Grade level",s:lv.name+" · "+sumW(W())+" marks",c:"done"},
+    {t:"#s-file",n:2,b:"Gradebook file",s:!S.source?"Not attached":S.source.demo?"Sample class":S.source.name,c:S.source&&!S.source.demo?"done":""},
+    {t:"#s-map",n:3,b:"Sections",s:files+" files · "+mapped+" of 4 sections set",c:mapped?"done":""},
+    {t:"#s-res",n:4,b:"Weighted marks",s:S.dirty?"Click Update Result":"Up to date",c:S.dirty?"warn":"done"},
+    (()=>{const mm=M.file?myaisMatch():null;return{t:"#s-myais",n:5,b:"MyAIS export",s:!mm?"Not attached":mm.matched+" of "+M.file.rows.length+" matched",c:mm&&mm.matched?"done":""}})()
+  ];
+  el.innerHTML=st.map(x=>`<button class="stp s${x.n} ${x.c}" type="button" data-go="${x.t}"><span class="c">${x.c==="done"?ICON_OK:x.n}</span><div><b>${x.b}</b><span>${esc(x.s)}</span></div></button>`).join("");
+}
+$("#steps").addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b){const t=$(b.dataset.go);if(t)t.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})}});
+const drop=$("#drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{if(!hasFiles(e))return;e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,()=>drop.classList.remove("over")));
+drop.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();e.stopPropagation();handleFile(e.dataTransfer.files[0])});
+$("#fileIn").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value=""});
+function hasFiles(e){return e.dataTransfer&&[...e.dataTransfer.types].includes("Files")}
+document.addEventListener("dragover",e=>{if(hasFiles(e))e.preventDefault()});
+document.addEventListener("drop",e=>{if(hasFiles(e)){e.preventDefault();handleFile(e.dataTransfer.files[0])}});
+
+/* ---------- UI: tray ---------- */
+function usedIn(fid){return KEYS.filter(k=>S.mode[k]==="files"&&S.zones[k].includes(fid))}
+function chipHTML(f,from){
+  const dots=from==="tray"?`<span class="dots">${usedIn(f.id).map(k=>`<i style="background:${ZCOLOR[k]}" title="In ${ZL(k)}"></i>`).join("")}</span>`:"";
+  const sel=from==="tray"&&S.selected.has(f.id)?" sel":"";
+  const x=from!=="tray"?`<button class="x" type="button" data-rm="${f.id}" data-z="${from}" aria-label="Remove ${esc(f.name)}">×</button>`:"";
+  const em=!f.count;
+  return `<span class="chip${sel}${em?" nomk":""}" draggable="true" data-f="${f.id}" data-from="${from}" tabindex="0" title="${esc(f.name)} · max ${f.max} · ${esc(f.cat)} · ${em?"no student has a mark in this file":f.count+" students have marks"}">${dots}<span class="nm">${esc(f.name)}</span><span class="mx">/${f.max}</span>${em?'<span class="emk">empty</span>':""}${x}</span>`;
+}
+function renderTray(){
+  const groups=[["cw","Classwork"],["hw","Homework"],["un","Ungraded"],["other","Other"]];
+  let list=S.files;if(S.trayFilter==="free")list=list.filter(f=>!usedIn(f.id).length);
+  const free=S.files.filter(f=>!usedIn(f.id).length).length;
+  let html=`<div class="trayhead"><h3 style="font-size:1rem">Your files</h3><div class="seg"><button type="button" data-tf="all" aria-pressed="${S.trayFilter==="all"}">All ${S.files.length}</button><button type="button" data-tf="free" aria-pressed="${S.trayFilter==="free"}">Not used ${free}</button></div></div>`;
+  if(S.selected.size){html+=`<div class="selbar"><span>${S.selected.size} selected → add to</span>${ZONES.map(z=>`<button class="btn sm" type="button" data-send="${z.k}" style="border-color:${ZCOLOR[z.k]}">${z.label}</button>`).join("")}<button class="linkbtn" type="button" data-clearsel>Clear</button></div>`}
+  else html+=`<p class="muted" style="font-size:.8rem">Drag a file onto a section, or tap files to select several at once.</p>`;
+  let any=false;
+  groups.forEach(([t,lab])=>{const g=list.filter(f=>f.type===t);if(!g.length)return;any=true;
+    html+=`<div class="group"><h4>${lab} · ${g.length}</h4><div class="chips">${g.map(f=>chipHTML(f,"tray")).join("")}</div></div>`});
+  if(!any)html+=`<p class="empty">${S.files.length?"Every file is in a section.":"Attach a gradebook to see its files."}</p>`;
+  $("#tray").innerHTML=html;
+}
+$("#tray").addEventListener("click",e=>{
+  const tf=e.target.closest("[data-tf]");if(tf){S.trayFilter=tf.dataset.tf;renderTray();return}
+  const sd=e.target.closest("[data-send]");if(sd){addTo(sd.dataset.send,[...S.selected],"tray");S.selected.clear();renderBoard();markDirty();return}
+  if(e.target.closest("[data-clearsel]")){S.selected.clear();renderTray();return}
+  const c=e.target.closest(".chip");if(c){const id=c.dataset.f;S.selected.has(id)?S.selected.delete(id):S.selected.add(id);renderTray();}
+});
+$("#tray").addEventListener("keydown",e=>{const c=e.target.closest(".chip");if(c&&(e.key===" "||e.key==="Enter")){e.preventDefault();c.click()}});
+
+/* ---------- UI: zones ---------- */
+function renderZones(){
+  queueMicrotask(renderProgress);
+  const w=W();
+  $("#zones").innerHTML=ZONES.map(z=>{
+    const k=z.k,ids=S.zones[k],off=!w[k],man=S.mode[k]==="manual";
+    const seg=`<span class="seg" role="group" aria-label="${z.label} mark source"><button type="button" data-mode="manual" data-z="${k}" aria-pressed="${man}">Type marks</button><button type="button" data-mode="files" data-z="${k}" aria-pressed="${!man}">From files</button></span>`;
+    let rule;
+    if(man)rule=`<span>Marks out of <input id="out_${k}" data-out="${k}" type="number" min="0.5" step="0.5" value="${outOf(k)}" aria-label="${z.label} marks out of"></span>`;
+    else if(k==="mid")rule=`<span>Average of the best <input id="midBest" type="number" min="1" max="20" value="${S.midBest}" aria-label="Number of best files"> files</span>`;
+    else rule=`<span>Average of all files</span>`;
+    if(!man&&ids.length)rule+=`<span class="num">· ${ids.length} file${ids.length>1?"s":""}</span>`;
+    let body;
+    if(man)body=`<div class="zdrop manual" data-dz="${k}"><span class="ph">Type each student's ${z.label} mark in the results table below.<br>You can paste a whole column from Excel. Dropping a file here switches back to files.</span></div>`;
+    else body=`<div class="zdrop" data-dz="${k}">${ids.length?ids.map(id=>{const f=S.files.find(x=>x.id===id);return f?chipHTML(f,k):""}).join(""):`<span class="ph">Drop files here</span>`}</div>`;
+    let foot="";
+    if(k==="quiz")foot=`<button class="btn sm" type="button" data-qa="allquiz">Add all quizzes</button>`;
+    if(!man){
+      if(k==="cw")foot=`<button class="btn sm" type="button" data-qa="allcw">Add all classwork</button>`;
+      if(k==="hw")foot=`<button class="btn sm" type="button" data-qa="allhw">Add all homework</button>`;
+      if(k==="mid")foot=`<button class="btn sm" type="button" data-qa="midcw">Use the C.W files</button>`;
+      if(ids.length)foot+=`<button class="btn sm" type="button" data-qa="clear" data-z="${k}">Clear all</button>`;
+    }
+    return `<div class="zone${off?" off":""}" data-z="${k}" data-dz="${k}">
+      <div class="zhead"><span class="zicon">${ZICON[k]}</span><div class="zt"><h3>${z.label}</h3><small>${z.full}</small></div><span class="wpill num">${off?"Not used":w[k]+" marks"}</span></div>
+      ${seg}<div class="rule">${rule}</div>
+      ${body}${foot?`<div class="zfoot">${foot}</div>`:""}</div>`;
+  }).join("");
+}
+function addTo(z,ids,from){
+  if(S.mode[z]==="manual")S.mode[z]="files";
+  ids.forEach(id=>{if(!S.zones[z].includes(id))S.zones[z].push(id);
+    if(from&&from!=="tray"&&from!==z&&z!=="mid"&&from!=="mid")S.zones[from]=S.zones[from].filter(x=>x!==id);});
+}
+$("#zones").addEventListener("click",e=>{
+  const rm=e.target.closest("[data-rm]");if(rm){const z=rm.dataset.z;S.zones[z]=S.zones[z].filter(x=>x!==rm.dataset.rm);renderBoard();markDirty();return}
+  const md=e.target.closest("[data-mode]");if(md){if(S.mode[md.dataset.z]!==md.dataset.mode){S.mode[md.dataset.z]=md.dataset.mode;renderBoard();markDirty();}return}
+  const qa=e.target.closest("[data-qa]");if(!qa)return;
+  const a=qa.dataset.qa;
+  if(a==="allcw")addTo("cw",S.files.filter(f=>f.type==="cw").map(f=>f.id));
+  if(a==="allhw")addTo("hw",S.files.filter(f=>f.type==="hw").map(f=>f.id));
+  if(a==="allquiz"){const q=S.files.filter(f=>/quiz/i.test(f.name)).map(f=>f.id);
+    if(!q.length){toast("No files with “quiz” in the name. Drag your quiz files in instead.");return}
+    addTo("quiz",q);const e=q.filter(id=>!S.files.find(f=>f.id===id).count).length;
+    toast(e===q.length?`Added ${q.length} quiz file${q.length>1?"s":""}, but ${q.length>1?"they have":"it has"} no marks in this export.`:`Added ${q.length} quiz file${q.length>1?"s":""}`);}
+  if(a==="midcw")S.zones.mid=S.zones.cw.slice();
+  if(a==="clear")S.zones[qa.dataset.z]=[];
+  renderBoard();markDirty();
+});
+$("#zones").addEventListener("input",e=>{
+  if(e.target.id==="midBest"){const v=parseInt(e.target.value,10);S.midBest=v>0?v:1;markDirty();}
+  const ok=e.target.dataset.out;if(ok){const v=parseFloat(e.target.value);S.outOf[ok]=v>0?v:null;markDirty();}
+});
+
+/* ---------- drag & drop between tray and sections ---------- */
+let drag=null;
+document.addEventListener("dragstart",e=>{
+  const c=e.target.closest&&e.target.closest(".chip");if(!c)return;
+  const id=c.dataset.f,from=c.dataset.from;
+  const ids=from==="tray"&&S.selected.has(id)?[...S.selected]:[id];
+  drag={ids,from};c.classList.add("dragging");
+  try{e.dataTransfer.setData("text/plain",ids.join(","));e.dataTransfer.effectAllowed="copyMove"}catch(_){}
+});
+document.addEventListener("dragend",e=>{const c=e.target.closest&&e.target.closest(".chip");if(c)c.classList.remove("dragging");clearOver();drag=null});
+function clearOver(){document.querySelectorAll(".over").forEach(x=>x!==drop&&x.classList.remove("over"))}
+document.addEventListener("dragover",e=>{if(!drag)return;const t=e.target.closest&&(e.target.closest(".zone")||e.target.closest(".tray"));
+  clearOver();if(t){e.preventDefault();t.classList.add("over")}});
+document.addEventListener("drop",e=>{if(!drag)return;e.preventDefault();clearOver();
+  const zone=e.target.closest(".zone"),tray=e.target.closest(".tray");
+  if(zone){addTo(zone.dataset.z,drag.ids,drag.from);if(drag.from==="tray")S.selected.clear();}
+  else if(tray&&drag.from!=="tray"){S.zones[drag.from]=S.zones[drag.from].filter(x=>!drag.ids.includes(x));}
+  drag=null;renderBoard();markDirty();
+});
+
+/* ---------- results ---------- */
+function visible(){
+  let list=S.students.slice();
+  if(S.hideEmpty)list=list.filter(s=>s.any);
+  const q=S.q.trim().toLowerCase();if(q)list=list.filter(s=>(s.name+" "+s.sid+" "+s.cls).toLowerCase().includes(q));
+  const rows=list.map(s=>({s,r:compute(s)}));
+  const k=S.sort.k,d=S.sort.dir;
+  rows.sort((a,b)=>{let x,y;if(k==="name"){x=a.s.name.toLowerCase();y=b.s.name.toLowerCase();return x<y?-d:x>y?d:0}
+    if(k==="sid"||k==="cls"){return String(a.s[k]).localeCompare(String(b.s[k]))*d}
+    x=a.r[k];y=b.r[k];x=x==null?-1:x;y=y==null?-1:y;return (x-y)*d});
+  if(!S.hideEmpty)rows.sort((a,b)=>(a.s.any?1:0)-(b.s.any?1:0));
+  return rows;
+}
+function usedKeys(){return KEYS.filter(k=>A.w[k])}
+function cell(v,title){return v==null?`<span class="na" title="${title||"No marks"}">—</span>`:`<span title="${title||""}">${fmt(v)}</span>`}
+function pctTitle(k,p,n){if(p==null)return"No marks";if(A.mode[k]==="manual")return `${ZL(k)}: typed mark, ${(p*100).toFixed(1)}%`;
+  return k==="mid"?`Mid-Test: best ${n} file${n>1?"s":""} average ${(p*100).toFixed(1)}%`:`${ZL(k)}: ${(p*100).toFixed(1)}% average of ${n} file${n>1?"s":""}`}
+function totColor(p){return p>=.7?"var(--good)":p>=.5?"var(--warn)":"var(--bad)"}
+function renderResults(){
+  if(!A)return;
+  const T=sumW(A.w),cols=[["name","Student"],["sid","ID"],["cls","Class"]];
+  usedKeys().forEach(k=>cols.push([k,ZL(k),A.w[k],A.mode[k]==="manual"]));cols.push(["total","Total",T]);
+  $("#tbl thead").innerHTML="<tr>"+cols.map(c=>`<th data-k="${c[0]}" aria-sort="${S.sort.k===c[0]?(S.sort.dir>0?"ascending":"descending"):"none"}">${c[1]}${S.sort.k===c[0]?(S.sort.dir>0?" ↑":" ↓"):""}${c[2]!=null?`<span class="w">/ ${c[2]}${c[3]?` · typed out of ${outOf(c[0],A)}`:""}</span>`:""}</th>`).join("")+"</tr>";
+  const rows=visible();
+  $("#tbl tbody").innerHTML=rows.length?rows.map(({s,r})=>rowHTML(s,r,T)).join(""):`<tr><td colspan="${cols.length}" style="text-align:center;padding:24px" class="muted">${S.students.length?"No students match your search.":"Attach a gradebook to see results."}</td></tr>`;
+  renderStats(rows,T);
+  const warns=sectionWarnings(A);
+  $("#warn").hidden=!warns.length;$("#warn").innerHTML=warns.map(x=>`<p>${esc(x)}</p>`).join("");
+  const hidden=S.students.filter(s=>!s.any).length;
+  $("#hideTxt").textContent=hidden?`Hide students with no marks (${hidden})`:"Hide students with no marks (none in this file)";
+  const typed=usedKeys().filter(k=>A.mode[k]==="manual").map(ZL);
+  queueMicrotask(renderMyais);
+  $("#foot").textContent=`File sections average the percentage of every file, then scale to the weight. Mid-Test uses each student's best ${A.midBest} file${A.midBest>1?"s":""}. `+
+    (typed.length?`Typed marks: ${typed.join(", ")}. `:"")+
+    (S.blank==="skip"?"Empty cells are skipped. ":"Empty cells count as zero. ")+(hidden&&S.hideEmpty?`${hidden} row${hidden>1?"s":""} with no marks hidden.`:"");
+}
+function rowHTML(s,r,T){
+  const mid=usedKeys().map(k=>{
+    if(A.mode[k]==="manual"){const v=S.manual[k][s.sid];const bad=v!=null&&v!==""&&+v>outOf(k,A);
+      return `<td data-c="${k}"><input class="qin${bad?" bad":""}" type="number" min="0" step="0.25" inputmode="decimal" id="m_${k}_${esc(s.sid)}" data-q="${esc(s.sid)}" data-zk="${k}" value="${v??""}" aria-label="${ZL(k)} mark for ${esc(s.name)}"></td>`}
+    return `<td data-c="${k}">${cell(r[k],pctTitle(k,r[k+"P"],r[k+"N"]))}</td>`}).join("");
+  const p=T?r.total/T:0;
+  return `<tr data-sid="${esc(s.sid)}"${s.any?"":' class="nomarks"'}><td class="nm">${esc(s.name)}${s.any?"":' <span class="nmtag">No marks</span>'}</td><td class="id">${esc(s.sid)}</td><td class="muted">${esc(s.cls)}</td>${mid}
+    <td class="tot" data-c="total">${totHTML(r.total,p)}</td></tr>`;
+}
+function totHTML(t,p){return `<span class="totcell"><span class="bar"><i style="width:${Math.min(100,p*100).toFixed(0)}%;background:${totColor(p)}"></i></span>${fmt(t)}</span>`}
+function renderStats(rows,T){
+  const t=rows.map(x=>x.r.total);
+  const a=avg(t),hi=t.length?Math.max(...t):null,lo=t.length?Math.min(...t):null,below=t.filter(v=>T&&v/T<.5).length;
+  const f=v=>v==null?"—":rnd(v).toFixed(+S.dec);
+  $("#stats").innerHTML=`<div class="stat"><small>Students</small><strong>${rows.length}</strong></div>
+   <div class="stat"><small>Class average</small><strong>${f(a)}</strong><em>/ ${T}</em></div>
+   <div class="stat"><small>Highest · Lowest</small><strong>${f(hi)}</strong><em>· ${f(lo)}</em></div>
+   <div class="stat"><small>Below 50%</small><strong style="color:${below?"var(--bad)":"inherit"}">${below}</strong></div>`;
+}
+$("#tbl").addEventListener("click",e=>{const th=e.target.closest("th");if(!th)return;const k=th.dataset.k;
+  S.sort=S.sort.k===k?{k,dir:-S.sort.dir}:{k,dir:k==="name"||k==="sid"||k==="cls"?1:-1};renderResults();});
+$("#tbl").addEventListener("input",e=>{const sid=e.target.dataset.q,k=e.target.dataset.zk;if(sid==null||!k)return;
+  const v=e.target.value;S.manual[k][sid]=v===""?"":parseFloat(v);
+  e.target.classList.toggle("bad",v!==""&&+v>outOf(k,A));updateRow(sid);});
+$("#tbl").addEventListener("paste",e=>{const sid=e.target.dataset&&e.target.dataset.q,k=e.target.dataset&&e.target.dataset.zk;if(sid==null||!k)return;
+  const txt=(e.clipboardData||window.clipboardData).getData("text");const vals=txt.split(/\r?\n/).map(x=>x.split("\t")[0].trim()).filter((x,i,a)=>!(i===a.length-1&&x===""));
+  if(vals.length<2)return;e.preventDefault();
+  const inputs=[...document.querySelectorAll(`.qin[data-zk="${k}"]`)];let i=inputs.indexOf(e.target);
+  vals.forEach(v=>{const el=inputs[i++];if(!el)return;const n=toNum(v);S.manual[k][el.dataset.q]=n==null?"":n;});
+  renderResults();toast("Pasted "+Math.min(vals.length,inputs.length)+" "+ZL(k)+" marks");});
+function updateRow(sid){
+  const s=S.students.find(x=>x.sid===sid),tr=[...document.querySelectorAll("#tbl tbody tr")].find(x=>x.dataset.sid===sid);if(!s||!tr)return;
+  const r=compute(s),T=sumW(A.w),p=T?r.total/T:0;
+  tr.querySelector('[data-c="total"]').innerHTML=totHTML(r.total,p);
+  renderStats(visible(),T);
+}
+$("#search").addEventListener("input",e=>{S.q=e.target.value;renderResults()});
+$("#dec").value=String(S.dec);$("#blank").value=S.blank;
+$("#dec").addEventListener("change",e=>{S.dec=+e.target.value;store.set("dec",S.dec);renderResults()});
+$("#blank").addEventListener("change",e=>{S.blank=e.target.value;store.set("blank",S.blank);renderResults()});
+$("#hideEmpty").addEventListener("change",e=>{S.hideEmpty=e.target.checked;renderResults();
+  const n=S.students.filter(s=>!s.any).length;
+  toast(n?(S.hideEmpty?`Hid ${n} student${n>1?"s":""} with no marks`:`Showing ${n} student${n>1?"s":""} with no marks at the top`):"Every student in this file has marks, so nobody is hidden.")});
+
+/* ---------- export (uses the updated results only) ---------- */
+function guard(){if(!S.dirty)return true;
+  toast("You changed the sections. Click Update Result first, then export.");
+  const b=$("#updbar .btn");if(b){b.classList.remove("pulse");void b.offsetWidth;b.classList.add("pulse")}
+  return false}
+function exportAoA(){
+  const T=sumW(A.w),head=["Student Name","ID","Class"];
+  usedKeys().forEach(k=>head.push(`${ZL(k)} (${A.w[k]})`));head.push(`Total (${T})`);
+  const n=v=>v==null?"":rnd(v);
+  const rows=visible().map(({s,r})=>{const a=[s.name,s.sid,s.cls];usedKeys().forEach(k=>a.push(n(r[k])));a.push(n(r.total));return a});
+  return [head,...rows];
+}
+function baseName(){const c=S.source&&S.source.cls[0]?S.source.cls[0]:"class";return (c+"_"+LEVELS.find(l=>l.k===A.level).name.replace(/[^\w]+/g,"")+"_weighted").replace(/[^\w.-]+/g,"_")}
+$("#copyBtn").addEventListener("click",()=>{
+  if(!guard())return;
+  const tsv=exportAoA().map(r=>r.join("\t")).join("\n");
+  const done=()=>toast("Copied. Paste into Excel or your school system.");
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(tsv).then(done,()=>fallbackCopy(tsv,done))}else fallbackCopy(tsv,done);
+});
+function fallbackCopy(t,done){const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();
+  let ok=false;try{ok=document.execCommand("copy")}catch(e){}ta.remove();ok?done():toast("Copy was blocked here. Use Download Excel instead.");}
+let dlP=null;function downloads(){if(!dlP)dlP=(window.claude&&window.claude.use)?window.claude.use("downloads").catch(()=>null):Promise.resolve(null);return dlP}
+async function save(filename,data,msg){
+  const dl=await downloads();
+  if(!dl){
+    try{const blob=data instanceof Blob?data:new Blob([data]);const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);a.download=filename;a.style.display="none";document.body.appendChild(a);a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast(msg||"Saved "+filename)}
+    catch(e){toast("The file couldn't be saved. Use Copy table instead.")}
+    return}
+  try{await dl.save({filename,data});toast(msg||"Saved "+filename)}
+  catch(e){if(e&&e.code==="declined")return;toast(e&&e.code==="rate_limited"?"A save is already open. Finish it first.":"The file couldn't be saved here. Use Copy table instead.")}
+}
+$("#csvBtn").addEventListener("click",()=>{
+  if(!guard())return;
+  const csv="﻿"+exportAoA().map(r=>r.map(v=>{v=String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(",")).join("\r\n");
+  save(baseName()+".csv",csv);
+});
+$("#xlsxBtn").addEventListener("click",()=>{
+  if(!guard())return;
+  if(!window.XLSX){toast("Excel export didn't load. Use Download CSV instead.");return}
+  const aoa=exportAoA(),ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=aoa[0].map((h,i)=>({wch:i===0?28:i<3?14:12}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Weighted marks");
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  save(baseName()+".xlsx",new Uint8Array(out));
+});
+
+/* ---------- step 5: MyAIS grade sheet ---------- */
+const M={file:null};
+const MLAB={cw:"C.W",hw:"H.W",quiz:"Quiz",mid:"Test"};
+function decodeBuf(buf){const u=new Uint8Array(buf);
+  if(u[0]===0xFF&&u[1]===0xFE)return{enc:"utf16le",bom:true,text:new TextDecoder("utf-16le").decode(u.subarray(2))};
+  if(u[0]===0xFE&&u[1]===0xFF)return{enc:"utf16be",bom:true,text:new TextDecoder("utf-16be").decode(u.subarray(2))};
+  if(u[0]===0xEF&&u[1]===0xBB&&u[2]===0xBF)return{enc:"utf8",bom:true,text:new TextDecoder("utf-8").decode(u.subarray(3))};
+  let z=0;for(let i=1;i<Math.min(u.length,400);i+=2)if(u[i]===0)z++;
+  if(z>40)return{enc:"utf16le",bom:false,text:new TextDecoder("utf-16le").decode(u)};
+  return{enc:"utf8",bom:false,text:new TextDecoder("utf-8").decode(u)};
+}
+function encodeOut(text,enc,bom){
+  if(enc==="utf8"){const b=new TextEncoder().encode(text);if(!bom)return b;const o=new Uint8Array(b.length+3);o.set([0xEF,0xBB,0xBF]);o.set(b,3);return o}
+  const off=bom?2:0,o=new Uint8Array(off+text.length*2),le=enc==="utf16le";
+  if(bom){o[0]=le?0xFF:0xFE;o[1]=le?0xFE:0xFF}
+  for(let i=0;i<text.length;i++){const c=text.charCodeAt(i),p=off+i*2;if(le){o[p]=c&255;o[p+1]=c>>8}else{o[p]=c>>8;o[p+1]=c&255}}
+  return o;
+}
+function splitLine(line,d){if(d==="\t"||!window.Papa)return line.split(d);return Papa.parse(line,{delimiter:d}).data[0]||[]}
+function joinLine(cells,d){if(d==="\t"||!window.Papa)return cells.join(d);return Papa.unparse([cells],{delimiter:d,newline:""})}
+function parseMyais(buf,name){
+  const dec=decodeBuf(buf),parts=dec.text.split(/(\r\n|\n|\r)/);
+  let hdr=-1,d="\t";
+  for(let i=0;i<parts.length;i+=2){const l=parts[i];if(/student\s*id/i.test(l)){hdr=i;d=l.includes("\t")?"\t":(l.split(";").length>l.split(",").length?";":",");break}}
+  if(hdr<0)throw new Error("This doesn't look like a MyAIS grade sheet. It needs a header row with “Student ID”.");
+  const H=splitLine(parts[hdr],d).map(x=>x.trim());
+  const find=re=>H.findIndex(h=>re.test(h));
+  const cols={id:find(/^student\s*id$/i),name:find(/^student\s*name$/i),
+    cw:find(/^c\.?\s*w\b/i),hw:find(/^h\.?\s*w\b/i),quiz:find(/^quiz/i),mid:find(/^(test|mid)/i),total:find(/^total/i)};
+  if(cols.id<0)throw new Error("No “Student ID” column found in the MyAIS sheet.");
+  if([cols.cw,cols.hw,cols.quiz,cols.mid].every(i=>i<0))throw new Error("No C.W, H.W, Quiz or Test columns found in the MyAIS sheet.");
+  const wOf=i=>{if(i<0)return null;const m=H[i].match(/\(\s*([\d.]+)\s*\)/);return m?parseFloat(m[1]):null};
+  const w={};KEYS.forEach(k=>w[k]=wOf(cols[k]));w.total=wOf(cols.total);
+  const meta={};
+  for(let i=0;i<hdr;i+=2){const c=splitLine(parts[i],d).map(x=>x.trim());c.forEach((v,j)=>{if(/:$/.test(v)&&c[j+1])meta[v.slice(0,-1).trim()]=c[j+1]})}
+  const rows=[];
+  for(let i=hdr+2;i<parts.length;i+=2){const c=splitLine(parts[i],d);const id=(c[cols.id]||"").trim();if(!id)continue;
+    rows.push({li:i,id,name:cols.name>=0?(c[cols.name]||"").replace(/\s+/g," ").trim():""})}
+  if(!rows.length)throw new Error("The MyAIS sheet has no student rows.");
+  M.file={name,enc:dec.enc,bom:dec.bom,delim:d,parts,hdr,H,cols,w,meta,rows};
+  renderMyais();renderProgress();
+  const m=myaisMatch();
+  toast(`MyAIS sheet loaded: ${m.matched} of ${rows.length} students matched`);
+}
+function readMyaisFile(file){
+  if(!file)return;
+  if(/\.xlsx?$/i.test(file.name)){toast("Attach the CSV grade sheet exactly as MyAIS gives it.");return}
+  const rd=new FileReader();
+  rd.onerror=()=>toast("Couldn't read that file. Download it from MyAIS again.");
+  rd.onload=()=>{try{parseMyais(rd.result,file.name||"Grade_Sheet.csv")}catch(e){toast(e.message||"That file couldn't be read.")}};
+  rd.readAsArrayBuffer(file);
+}
+function myaisMatch(){const f=M.file;if(!f)return null;
+  const by=new Map(S.students.map(s=>[s.sid.trim().toUpperCase(),s]));
+  const rows=f.rows.map(r=>({r,s:by.get(r.id.toUpperCase())||null}));
+  const ids=new Set(f.rows.map(r=>r.id.toUpperCase()));
+  const extra=S.students.filter(s=>s.any&&!ids.has(s.sid.trim().toUpperCase()));
+  return{rows,extra,matched:rows.filter(x=>x.s).length};
+}
+function myaisVals(s){const f=M.file,r=compute(s),o={};
+  KEYS.forEach(k=>{o[k]=(f.cols[k]>=0&&A.w[k]&&r[k]!=null)?rnd(r[k]):null});
+  o.total=rnd(KEYS.reduce((t,k)=>t+(o[k]||0),0));return o}
+function buildMyais(){
+  const f=M.file,parts=f.parts.slice(),m=myaisMatch();let n=0;
+  m.rows.forEach(({r,s})=>{if(!s)return;const v=myaisVals(s),c=splitLine(parts[r.li],f.delim);
+    KEYS.forEach(k=>{const ci=f.cols[k];if(ci>=0&&v[k]!=null){while(c.length<=ci)c.push("");c[ci]=String(v[k])}});
+    if(f.cols.total>=0){let t=0;KEYS.forEach(k=>{const ci=f.cols[k];if(ci>=0){const x=toNum(c[ci]);if(x!=null)t+=x}});c[f.cols.total]=String(rnd(t))}
+    parts[r.li]=joinLine(c,f.delim);n++});
+  return{bytes:encodeOut(parts.join(""),f.enc,f.bom),n};
+}
+function weightIssues(){const f=M.file,out=[];
+  KEYS.forEach(k=>{const ci=f.cols[k];
+    if(ci<0){if(A.w[k])out.push({k,txt:`${ZL(k)} has no column in this MyAIS sheet, so it won't be exported.`});return}
+    const mw=f.w[k];if(mw!=null&&Math.abs(mw-A.w[k])>1e-9)out.push({k,mis:true,txt:`MyAIS expects ${f.H[ci]} but the app gives ${ZL(k)} out of ${A.w[k]}.`})});
+  return out}
+function renderMyais(){
+  const info=$("#minfo"),body=$("#mbody"),btn=$("#myaisBtn");if(!info)return;
+  const f=M.file;
+  if(!f){btn.disabled=true;$("#mtop").classList.remove("loaded");
+    info.innerHTML=`<ol class="howto"><li><span>1</span><div><b>Download</b> the Grade Sheet Form for your class from MyAIS.</div></li><li><span>2</span><div><b>Attach</b> it here. Students are matched by Student ID.</div></li><li><span>3</span><div><b>Click Export to MyAIS</b>, then upload the filled file back to MyAIS.</div></li></ol>`;
+    body.innerHTML="";return}
+  if(!A)return;
+  $("#mtop").classList.add("loaded");
+  const m=myaisMatch();btn.disabled=!m.matched;
+  const icon=SV('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/>');
+  const meta=["Subject","Course-Batch","Quarter","Teacher"].filter(k=>f.meta[k]).map(k=>`<div><small>${k}</small><b>${esc(f.meta[k])}</b></div>`).join("");
+  info.innerHTML=`<div class="fsum myais"><span class="fi">${icon}</span><div class="ft"><b>${esc(f.name)}</b><span class="num">${f.rows.length} students · ${m.matched} matched</span></div><button class="linkbtn" type="button" data-mclear>Remove</button></div>${meta?`<div class="meta">${meta}</div>`:""}`;
+  const iss=weightIssues(),mis=iss.some(x=>x.mis);
+  const ks=KEYS.filter(k=>f.cols[k]>=0);
+  const pills=ks.map(k=>{const bad=iss.some(x=>x.k===k&&x.mis);return `<span class="wchk ${bad?"bad":"ok"}">${bad?"✗":"✓"} ${esc(f.H[f.cols[k]])} ← ${ZL(k)} ${A.w[k]}</span>`}).join("");
+  const missing=m.rows.filter(x=>!x.s).length;
+  let html=`<div class="mmap"><span class="muted">Columns</span>${pills}</div>`;
+  if(S.dirty)html+=`<div class="warn"><p>You changed the sections. Click Update Result first; this preview shows the last updated marks.</p></div>`;
+  if(iss.length)html+=`<div class="warn">${iss.map(x=>`<p>${esc(x.txt)}</p>`).join("")}${mis?`<p><button class="btn sm" type="button" data-musew>Use the MyAIS weights</button> <span class="muted">or choose the matching grade level in step 1.</span></p>`:""}</div>`;
+  if(missing||m.extra.length)html+=`<div class="warn">${missing?`<p>${missing} student${missing>1?"s":""} in the MyAIS sheet ${missing>1?"are":"is"} not in your gradebook and will be left unchanged.</p>`:""}${m.extra.length?`<p>Not in the MyAIS sheet: ${esc(m.extra.slice(0,6).map(s=>s.name).join(", "))}${m.extra.length>6?` and ${m.extra.length-6} more`:""}.</p>`:""}</div>`;
+  const th=`<tr><th>No</th><th>Student ID</th><th>Student Name</th>${ks.map(k=>`<th class="r" data-k="${k}">${esc(f.H[f.cols[k]])}</th>`).join("")}${f.cols.total>=0?`<th class="r">${esc(f.H[f.cols.total])}</th>`:""}<th>Match</th></tr>`;
+  const tb=m.rows.map(({r,s},i)=>{const v=s?myaisVals(s):null;
+    return `<tr${s?"":' class="nomarks"'}><td>${i+1}</td><td class="id">${esc(r.id)}</td><td class="nm">${esc(r.name)}</td>${ks.map(k=>`<td class="r">${v&&v[k]!=null?v[k].toFixed(+S.dec):'<span class="na">—</span>'}</td>`).join("")}${f.cols.total>=0?`<td class="r tot">${v?v.total.toFixed(+S.dec):'<span class="na">—</span>'}</td>`:""}<td>${s?'<span class="mst ok">Matched</span>':'<span class="mst miss">Not in gradebook</span>'}</td></tr>`}).join("");
+  html+=`<div class="tablewrap mt"><table class="mtbl"><thead>${th}</thead><tbody>${tb}</tbody></table></div>`;
+  body.innerHTML=html;
+}
+$("#mfileIn").addEventListener("change",e=>{readMyaisFile(e.target.files[0]);e.target.value=""});
+const mdrop=$("#mdrop");
+["dragenter","dragover"].forEach(ev=>mdrop.addEventListener(ev,e=>{if(!hasFiles(e))return;e.preventDefault();e.stopPropagation();mdrop.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>mdrop.addEventListener(ev,()=>mdrop.classList.remove("over")));
+mdrop.addEventListener("drop",e=>{if(!hasFiles(e))return;e.preventDefault();e.stopPropagation();readMyaisFile(e.dataTransfer.files[0])});
+$("#s-myais").addEventListener("click",e=>{
+  if(e.target.closest("[data-mclear]")){M.file=null;renderMyais();renderProgress();return}
+  if(e.target.closest("[data-musew]")){const f=M.file,nw=Object.assign({},W());KEYS.forEach(k=>{if(f.cols[k]>=0&&f.w[k]!=null)nw[k]=f.w[k]});
+    S.custom[S.level]=nw;store.set("custom",S.custom);S.outOf={};renderLevels();renderZones();applyNow(true);toast("Weights now match the MyAIS sheet")}
+});
+$("#myaisBtn").addEventListener("click",()=>{
+  if(!M.file){toast("Attach the MyAIS grade sheet first.");return}
+  if(!guard())return;
+  const {bytes,n}=buildMyais();
+  save(M.file.name,bytes,`Filled ${n} students. Upload this file back to MyAIS.`);
+});
+
+/* ---------- misc ---------- */
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+let tt;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),3200)}
+function renderBoard(){renderTray();renderZones()}
+
+try{parseRows(demoRows(),"Sample class",true)}catch(e){renderLevels();renderBoard();applyNow(true)}
+})();
+</script>
+
+</body>
+</html>
